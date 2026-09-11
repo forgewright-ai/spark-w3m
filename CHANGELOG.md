@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.1.0
+
+- One key, one grammar. M-a is gone; M-s now opens `spark> ` on the
+  screen (the wrapper draws it on the terminal while w3m waits -- w3m
+  cannot pre-fill its own prompt): Enter or `?` alone is the overview,
+  words are the question (a leading `?` stripped, the editors' habit;
+  globs stay literal), `--part 2 words` rides, Ctrl-C cancels into an
+  empty buffer (B goes back; w3m stops reading its stream on the same
+  SIGINT, so no goodbye line can land there). Nobody types `spark-w3m`
+  inside w3m any more. From the maintainer's first real session: the
+  two keys read press-after vs press-before, and w3m's bare pipe
+  prompt hinted nothing.
+
 ## 1.0.2
 
 - The wrapper wraps long lines at spaces (`fold -s`, `SPARK_W3M_WIDTH`,

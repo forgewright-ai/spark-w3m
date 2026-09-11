@@ -3,7 +3,30 @@
 # so the refusal a source earns ("the source does not answer -- it
 # opens: ...", or the part count of a long page) shows in w3m's pipe
 # buffer instead of vanishing; and long lines wrapped at spaces, because
-# w3m shows piped text as it comes -- one long line otherwise.
-# SPARK_W3M_WIDTH sets the wrap column (default 78). Nothing else: the
-# page text rides stdin, your words ride argv, spark does the rest.
+# w3m shows piped text as it comes. SPARK_W3M_WIDTH sets the wrap
+# column (default 78).
+#
+# --ask is the key's mode (keymap M-s): the spark prompt on the
+# terminal while w3m waits, the page still on stdin. Enter or ? alone
+# is the overview; words (a leading ?, the editors' habit, stripped)
+# are the question, flags like --part 2 ride along; Ctrl-C is never
+# mind. The words never glob (set -f) and never touch the page.
+case ${1-} in
+    --ask)
+        old=$(stty -g < /dev/tty 2>/dev/null || true)
+        # Ctrl-C cancels: w3m stops reading its stream on the same
+        # SIGINT, so no goodbye line can land in the buffer -- the
+        # empty buffer is the cancel, and B goes back. Restore the tty.
+        trap '[ -z "$old" ] || stty "$old" < /dev/tty; exit 130' INT
+        [ -z "$old" ] || stty sane < /dev/tty
+        printf 'spark> ' > /dev/tty
+        IFS= read -r q < /dev/tty || q=
+        trap - INT
+        [ -z "$old" ] || stty "$old" < /dev/tty
+        case $q in "?"*) q=${q#?} ;; esac
+        set -f
+        set -- $q
+        set +f
+        ;;
+esac
 spark read "$@" 2>&1 | fold -s -w "${SPARK_W3M_WIDTH:-78}"

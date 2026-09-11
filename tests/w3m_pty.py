@@ -159,10 +159,12 @@ def main():
             b.mark()
             return b
 
-        # A. M-s: the rendered page goes through spark-w3m to spark read
+        # A. M-s opens the spark prompt; Enter alone is the overview
         b = fresh()
         b.send("\x1bs")
-        ok(b.expect("STUB-READ"), "M-s pipes the page: the answer opens in a buffer", b.plain()[-300:])
+        ok(b.expect("spark>"), "M-s opens the spark prompt on screen", b.plain()[-200:])
+        b.send("\r")
+        ok(b.expect("STUB-READ"), "Enter alone is the overview: the answer opens in a buffer", b.plain()[-300:])
         got = logged()
         ok(got.strip() == "read", "spark read got no words -- the overview, no name, no path", got)
         ok(work not in got and "page.html" not in got, "the page's path never reaches spark", got)
@@ -175,29 +177,67 @@ def main():
         b.read(1.0)
         b.close()
 
-        # B. M-a: w3m's pipe prompt takes a question for spark-w3m
+        # B. words at the prompt are the question; glob characters stay
+        # literal (the wrapper word-splits under set -f)
         b = fresh()
-        b.send("\x1ba")
-        ok(b.expect("Pipe"), "M-a opens w3m's pipe prompt", b.plain()[-200:])
-        b.send("spark-w3m does it mention prices\r")
-        ok(b.expect("STUB-READ"), "the words run the pipe: the answer opens in a buffer", b.plain()[-300:])
-        ok(logged().strip() == "read does it mention prices",
-           "spark read got exactly the words", logged())
+        b.send("\x1bs")
+        b.expect("spark>")
+        b.send("does it mention *prices*\r")
+        ok(b.expect("STUB-READ"), "words run the question: the answer opens in a buffer", b.plain()[-300:])
+        ok(logged().strip() == "read does it mention *prices*",
+           "spark read got exactly the words, globs literal", logged())
         b.send("B")
         b.send("Q")
         b.read(1.0)
         b.close()
 
-        # C. a refusal on spark's stderr still shows in the buffer: the
-        # wrapper folds stderr into the answer
+        # C. the editors' habit and the flags: a leading ? is stripped,
+        # --part rides to spark read
         b = fresh()
-        b.send("\x1ba")
-        b.expect("Pipe")
-        b.send("spark-w3m fail\r")
-        # match ONE token: w3m draws a line word by word, each with its
-        # own cursor move, so multi-word matches read concatenated
+        b.send("\x1bs")
+        b.expect("spark>")
+        b.send("? is this clear\r")
+        b.expect("STUB-READ")
+        ok(logged().strip() == "read is this clear", "a leading ? is stripped, the editors' habit", logged())
+        b.send("B")
+        b.send("Q")
+        b.read(1.0)
+        b.close()
+        b = fresh()
+        b.send("\x1bs")
+        b.expect("spark>")
+        b.send("--part 2 what repeats about gates\r")
+        b.expect("STUB-READ")
+        ok(logged().strip() == "read --part 2 what repeats about gates",
+           "flags typed at the prompt ride to spark read", logged())
+        b.send("B")
+        b.send("Q")
+        b.read(1.0)
+        b.close()
+
+        # D. a refusal on spark's stderr still shows in the buffer: the
+        # wrapper folds stderr into the answer. Match ONE token: w3m
+        # draws a line word by word, each with its own cursor move
+        b = fresh()
+        b.send("\x1bs")
+        b.expect("spark>")
+        b.send("fail\r")
         ok(b.expect("STUB-OPENING"), "a refusal shows in the buffer, not lost on stderr", b.plain()[-300:])
         b.send("B")
+        b.send("Q")
+        b.read(1.0)
+        b.close()
+
+        # E. Ctrl-C at the prompt is never mind: nothing runs, w3m lives
+        b = fresh()
+        b.send("\x1bs")
+        b.expect("spark>")
+        b.send("\x03")
+        time.sleep(0.6)
+        ok(not os.path.exists(log), "Ctrl-C at the prompt runs nothing")
+        b.mark()
+        b.send("B")                 # back: the page is still there
+        ok(b.expect("gate"), "B returns to the page after the cancel", b.plain()[-200:])
         b.send("Q")
         b.read(1.0)
         b.close()

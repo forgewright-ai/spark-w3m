@@ -1,0 +1,21 @@
+# spark in w3m -- your own AI, on your own machine (spark.forgewright.ai).
+# Append these lines to your own ~/.w3m/keymap:
+#
+#     cat ~/.w3m/spark/keymap.spark >> ~/.w3m/keymap
+#
+#   M-s  the page you are reading goes to `spark read`: what does this
+#        page cover? The answer opens in a new buffer, every line
+#        quoting the page; B goes back.
+#   M-a  w3m's pipe prompt, for a question: type `spark-w3m your words`
+#        and press Enter. A page past 16 kB answers with its part count;
+#        `spark-w3m --part 2 your words` reads part 2.
+#
+# spark-w3m is this repository's one-line wrapper around `spark read`:
+# it folds spark's stderr into the answer, so a refusal ("the source
+# does not answer -- it opens: ...") shows in the buffer instead of
+# vanishing. Nothing leaves this machine but the rendered page text and
+# your words, to the brain spark is configured for -- never the URL.
+# Needs w3m 0.5.3 or newer and spark 1.20 or newer. M-s and M-a are
+# suggestions -- edit the two lines to taste.
+keymap M-s PIPE_BUF "spark-w3m"
+keymap M-a PIPE_BUF

@@ -1,0 +1,7 @@
+#!/bin/sh
+# spark-w3m -- `spark read` for a w3m buffer: stderr folded into stdout,
+# so the refusal a source earns ("the source does not answer -- it
+# opens: ...", or the part count of a long page) shows in w3m's pipe
+# buffer instead of vanishing. Nothing else: the page text rides stdin,
+# your words ride argv, spark does the rest.
+exec spark read "$@" 2>&1

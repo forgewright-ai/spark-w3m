@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.0.1
+
+- The wrapper ships executable. 1.0.0's `spark-w3m` had no execute bit:
+  the pty test chmod'd its own copy and so proved a file nobody ships;
+  it now symlinks the repo's file as the README installs it, so the bit
+  is part of what the test proves. Found on the box, the first real
+  install.
+
 ## 1.0.0
 
 - The first release: the page under M-s goes to `spark read` (the

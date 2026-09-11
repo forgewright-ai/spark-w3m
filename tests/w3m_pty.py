@@ -126,8 +126,10 @@ def main():
             snippet = f.read()
         with open(os.path.join(tmp, ".w3m", "keymap"), "a") as f:
             f.write(snippet)
-        shutil.copy(os.path.join(REPO, "spark-w3m"), os.path.join(bindir, "spark-w3m"))
-        os.chmod(os.path.join(bindir, "spark-w3m"), 0o755)
+        # the README's ln -s, performed as shipped: no chmod here -- the
+        # repo file must already be executable, or this test must fail
+        # the way the box did
+        os.symlink(os.path.join(REPO, "spark-w3m"), os.path.join(bindir, "spark-w3m"))
         stub = os.path.join(bindir, "spark")
         with open(stub, "w") as f:
             f.write(STUB)

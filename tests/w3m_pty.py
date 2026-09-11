@@ -36,6 +36,7 @@ printf '%s\n' "$*" >> "$STUB_LOG"
 cat > "$STUB_LOG.stdin"
 case " $* " in
     *" fail "*)   printf 'spark: the source does not answer -- it opens: "STUB-OPENING ..."\n' >&2; exit 1 ;;
+    *" long "*)   i=0; while [ $i -lt 40 ]; do printf 'wrapword '; i=$((i+1)); done; printf '\n'; exit 0 ;;
 esac
 printf 'STUB-READ\n'
 '''
@@ -201,7 +202,16 @@ def main():
         b.read(1.0)
         b.close()
 
-        # D. the page on disk is untouched (a reader never writes)
+        # D. long lines wrap at spaces before w3m sees them (the wrapper's
+        # fold): w3m shows piped text as it comes, one long line otherwise
+        long_out = subprocess.run([os.path.join(bindir, "spark-w3m"), "long"],
+                                  input=b"x", env=env, cwd=work,
+                                  stdout=subprocess.PIPE).stdout.decode()
+        ok(long_out.strip() and all(len(l) <= 78 for l in long_out.splitlines())
+           and not any(l.endswith("wrapwo") for l in long_out.splitlines()),
+           "a long answer wraps at spaces, at most 78 columns", repr(long_out[:100]))
+
+        # E. the page on disk is untouched (a reader never writes)
         with open(page) as f:
             ok(f.read() == PAGE, "the page on disk is untouched")
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.0.2
+
+- The wrapper wraps long lines at spaces (`fold -s`, `SPARK_W3M_WIDTH`,
+  default 78): w3m shows piped text as it comes, so an answer used to
+  land as one long line to scroll sideways. Found reading a real answer
+  under M-s.
+
 ## 1.0.1
 
 - The wrapper ships executable. 1.0.0's `spark-w3m` had no execute bit:

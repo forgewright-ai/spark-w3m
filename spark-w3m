@@ -2,6 +2,8 @@
 # spark-w3m -- `spark read` for a w3m buffer: stderr folded into stdout,
 # so the refusal a source earns ("the source does not answer -- it
 # opens: ...", or the part count of a long page) shows in w3m's pipe
-# buffer instead of vanishing. Nothing else: the page text rides stdin,
-# your words ride argv, spark does the rest.
-exec spark read "$@" 2>&1
+# buffer instead of vanishing; and long lines wrapped at spaces, because
+# w3m shows piped text as it comes -- one long line otherwise.
+# SPARK_W3M_WIDTH sets the wrap column (default 78). Nothing else: the
+# page text rides stdin, your words ride argv, spark does the rest.
+spark read "$@" 2>&1 | fold -s -w "${SPARK_W3M_WIDTH:-78}"

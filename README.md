@@ -30,7 +30,8 @@ cat ~/.w3m/spark/keymap.spark >> ~/.w3m/keymap
 
 `spark-w3m` is a one-line wrapper around `spark read` that folds stderr
 into the answer, so a refusal shows in w3m's buffer instead of
-vanishing. An update is `git -C ~/.w3m/spark pull`, then delete the old
+vanishing, and wraps long lines at spaces, so the buffer reads without
+sideways scrolling (`SPARK_W3M_WIDTH` sets the column, default 78). An update is `git -C ~/.w3m/spark pull`, then delete the old
 spark lines from `~/.w3m/keymap` and append again. The comment block in
 `keymap.spark` is the help; M-s and M-a are suggestions -- edit the two
 lines to taste (w3m's own M-s, save buffer, moves aside).

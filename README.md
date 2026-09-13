@@ -41,7 +41,8 @@ same wrapper takes the words directly: `w3m -dump URL | spark-w3m your
 words`. An update is `git -C ~/.w3m/spark pull`, then delete the old
 spark lines from `~/.w3m/keymap` and append again. The comment block in
 `keymap.spark` is the help; M-s is a suggestion -- edit the line to
-taste (w3m's own M-s, save buffer, moves aside).
+taste (w3m's own M-s, save buffer, moves aside). The keys, and what
+to ask: `CHEATSHEET.md`.
 
 ## What leaves this machine
 

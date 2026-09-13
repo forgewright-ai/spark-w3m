@@ -19,7 +19,10 @@ case ${1-} in
         # empty buffer is the cancel, and B goes back. Restore the tty.
         trap '[ -z "$old" ] || stty "$old" < /dev/tty; exit 130' INT
         [ -z "$old" ] || stty sane < /dev/tty
-        printf 'spark> ' > /dev/tty
+        # w3m leaves the cursor anywhere (top-left on the console, over
+        # the page's first line); put the prompt on the screen's last
+        # row -- row 9999 clamps to the bottom -- and clear that row.
+        printf '\033[9999;1H\033[2Kspark> ' > /dev/tty
         IFS= read -r q < /dev/tty || q=
         trap - INT
         [ -z "$old" ] || stty "$old" < /dev/tty

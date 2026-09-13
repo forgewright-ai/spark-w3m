@@ -163,6 +163,9 @@ def main():
         b = fresh()
         b.send("\x1bs")
         ok(b.expect("spark>"), "M-s opens the spark prompt on screen", b.plain()[-200:])
+        ok(b"\x1b[9999;1H\x1b[2Kspark> " in b.buf,
+           "the prompt homes to the screen's last row, not over the page",
+           repr(b.buf[-120:]))
         b.send("\r")
         ok(b.expect("STUB-READ"), "Enter alone is the overview: the answer opens in a buffer", b.plain()[-300:])
         got = logged()

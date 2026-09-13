@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.1.1
+
+- The prompt homes to the screen's last row. w3m leaves the cursor
+  anywhere when it runs the pipe command -- on the console, top-left,
+  so `spark> ` printed over the page's first line. The wrapper now
+  addresses the bottom row and clears it before drawing; the pty test
+  asserts the position. From the maintainer's first session at the
+  box console.
+
 ## 1.1.0
 
 - One key, one grammar. M-a is gone; M-s now opens `spark> ` on the

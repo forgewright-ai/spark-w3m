@@ -21,7 +21,7 @@ jobs:
       - name: ascii docs
         run: |
           tab=$(printf '\t')
-          for f in README.md CHANGELOG.md CREDITS.md LICENSE keymap.spark spark-w3m; do
+          for f in README.md CHANGELOG.md CHEATSHEET.md CREDITS.md LICENSE keymap.spark spark-w3m; do
             ! LC_ALL=C grep -n "[^ -~${tab}]" "$f"; done
       - name: w3m
         run: sudo apt-get install -y -qq w3m >/dev/null && w3m -version

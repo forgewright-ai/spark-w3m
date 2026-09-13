@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.1.2
+
+- The Enter at the prompt scrolled the screen. The bottom row's echoed
+  newline moved everything up one line behind w3m's back, and every
+  repaint after was one row off (doubled lines, the answer over the
+  page). The prompt now reads keys raw and echoes them itself --
+  backspace edits, Ctrl-C still cancels, and the Enter is swallowed:
+  no newline ever reaches the tty. From the maintainer's session at
+  the box console, photos in hand.
+
 ## 1.1.1
 
 - The prompt homes to the screen's last row. w3m leaves the cursor

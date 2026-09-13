@@ -181,14 +181,20 @@ def main():
         b.close()
 
         # B. words at the prompt are the question; glob characters stay
-        # literal (the wrapper word-splits under set -f)
+        # literal (the wrapper word-splits under set -f); a backspace
+        # edits, and the raw reader echoes NO newline for the Enter --
+        # a newline on the bottom row scrolls the screen under w3m
         b = fresh()
         b.send("\x1bs")
         b.expect("spark>")
-        b.send("does it mention *prices*\r")
+        b.send("does it mention *prices*X\x7f\r")
         ok(b.expect("STUB-READ"), "words run the question: the answer opens in a buffer", b.plain()[-300:])
         ok(logged().strip() == "read does it mention *prices*",
-           "spark read got exactly the words, globs literal", logged())
+           "spark read got exactly the words, globs literal, backspace edits", logged())
+        i = b.buf.find(b"*prices*X")
+        ok(i > 0 and b"\n" not in b.buf[i:i + 40].split(b"STUB", 1)[0].replace(b"\x1b[2K", b""),
+           "the Enter is swallowed: no newline echoed on the bottom row",
+           repr(b.buf[i:i + 60]))
         b.send("B")
         b.send("Q")
         b.read(1.0)

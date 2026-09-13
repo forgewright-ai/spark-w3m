@@ -18,12 +18,30 @@ case ${1-} in
         # SIGINT, so no goodbye line can land in the buffer -- the
         # empty buffer is the cancel, and B goes back. Restore the tty.
         trap '[ -z "$old" ] || stty "$old" < /dev/tty; exit 130' INT
-        [ -z "$old" ] || stty sane < /dev/tty
         # w3m leaves the cursor anywhere (top-left on the console, over
         # the page's first line); put the prompt on the screen's last
         # row -- row 9999 clamps to the bottom -- and clear that row.
+        # The keys are read raw and echoed by hand, and Enter is
+        # swallowed: a newline echoed on the bottom row scrolls the
+        # whole screen, and w3m, not knowing, then repaints every row
+        # one off. No byte but the typed characters reaches the tty.
+        [ -z "$old" ] || stty -icanon -echo min 1 time 0 < /dev/tty
         printf '\033[9999;1H\033[2Kspark> ' > /dev/tty
-        IFS= read -r q < /dev/tty || q=
+        q=
+        while :; do
+            c=$(dd bs=1 count=1 2>/dev/null < /dev/tty)
+            case $c in
+                ""|"$(printf '\r')") break ;;
+                "$(printf '\003')")
+                    printf '\033[2K\033[9999;1H' > /dev/tty
+                    [ -z "$old" ] || stty "$old" < /dev/tty
+                    exit 130 ;;
+                "$(printf '\177')"|"$(printf '\b')")
+                    [ -z "$q" ] || { q=${q%?}; printf '\b \b' > /dev/tty; } ;;
+                *) q="$q$c"; printf %s "$c" > /dev/tty ;;
+            esac
+        done
+        printf '\033[2K\033[9999;1H' > /dev/tty
         trap - INT
         [ -z "$old" ] || stty "$old" < /dev/tty
         case $q in "?"*) q=${q#?} ;; esac

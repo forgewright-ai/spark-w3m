@@ -167,6 +167,7 @@ def main():
            "the prompt homes to the screen's last row, not over the page",
            repr(b.buf[-120:]))
         b.send("\r")
+        ok(b.expect("characters"), "the pulse names the page's size on the bottom row", b.plain()[-200:])
         ok(b.expect("STUB-READ"), "Enter alone is the overview: the answer opens in a buffer", b.plain()[-300:])
         got = logged()
         ok(got.strip() == "read", "spark read got no words -- the overview, no name, no path", got)

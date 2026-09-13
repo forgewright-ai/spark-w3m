@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.0
+
+- The wait says what it is, on the one row this wrapper may touch:
+  after the question, the bottom row shows `spark reads N characters
+  | 12s` -- an ASCII spinner and the seconds, absolute addressing,
+  never a newline -- cleared when the answer buffer is ready. w3m
+  shows a piped buffer only at its end (measured), so the spinner
+  runs the whole wait. The same pulse spark-newsboat wears.
+
 ## 1.1.2
 
 - The Enter at the prompt scrolled the screen. The bottom row's echoed

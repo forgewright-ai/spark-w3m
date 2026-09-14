@@ -50,33 +50,44 @@ Leaving and help
 ## 2. the page, with spark
 
 One key: M-s. The page you are reading is stashed and the spark page
-opens -- a page like any other, drawn by w3m itself. Nothing runs
-until you ask, and B is always the way back.
+opens -- a small place drawn by w3m itself, spark's S beside the
+page's card. Nothing runs until you ask; B always walks back.
 
-    spark> [field]   your question: Tab to the field, Enter to type,
-                     Enter again, then Tab to [ask] and Enter
-    overview         a link: what does this page cover?
-    part 1 . part 2  links, on a page past 16 kB: read one part
-    B                never mind, or back from an answer
+    chat> [field]    the conversation: Tab lands you on it (the
+                     cursor starts there), Enter to type, Enter,
+                     then [say]. Follow-ups ride the same thread;
+                     the page re-renders as the whole log
+    overview         a link: what does this page cover? every line
+                     quotes the page, or an honest refusal, framed
+    questions        a link: what does this page NOT answer? each
+                     question is a link that asks itself
+    part 1 . 2       links, past 16 kB: read one part
+    q, :q, quit      said to the field: a quit word never reaches
+                     the model
+    B                from an answer, the front room; again, the
+                     page itself -- two presses from any depth
 
 By example
 
     an article     M-s, overview
-                   what it covers, before you commit to reading it all
-    a long read    M-s, spark> does it mention pricing
-                   the answer quotes the lines that do
-    a manual       M-s -- the part links appear; part 3, then ask away
-    a follow-up    the answer page carries the field again: ask right
-                   there, B walks back through the exchange
+                   what it covers, before you commit to reading
+    a claim        M-s, chat> does it name a source for the numbers
+    a critique     M-s, questions -- what the page left unanswered,
+                   each one a click from being asked
+    a follow-up    the field is on every answer page: just keep
+                   talking; "translate that" knows what that is
+    a manual       M-s -- part links appear; part 3, then ask away
 
-While the model reads, the bottom row counts: `spark reads N
-characters | 12s`. Every answer line quotes the page; when the page
-does not hold the answer, the reply is one line showing the page's
-own opening words -- never a guess.
+While the model works the bottom row counts: `reading N characters
+| 12s` first, `thinking | 6s` after. The card remembers: "asked
+before: N" is spark's reading ledger for this page.
 
 From a plain shell, the same wrapper reads any text:
 
     w3m -dump URL | spark-w3m your words
 
-With the plugin installed, M-s belongs to spark; w3m's own M-s (save
-source) moves aside -- edit the line in `~/.w3m/keymap` to taste.
+The masthead is spark's own banner S, borrowed from your spark
+install; a plain-ASCII S stands in on the console
+(SPARK_W3M_MASTHEAD=s|word|none overrides). With the plugin
+installed, M-s belongs to spark; w3m's own M-s (save source) moves
+aside -- edit the line in `~/.w3m/keymap` to taste.

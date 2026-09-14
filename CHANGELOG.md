@@ -1,5 +1,34 @@
 # Changelog
 
+## 2.1.0
+
+- The spark page becomes a place. The front room greets with spark's
+  own S (the banner's first eight columns, read from your spark
+  install at runtime; a plain-ASCII S on the console or without one)
+  beside the page's card, hello, and the ways in.
+- The conversation: words in the `chat>` field run `spark edit ?`
+  with a per-stash thread -- follow-ups ride the earlier turns, the
+  transcript is kept beside the stash, and the page re-renders as
+  the whole log. An unheld quote is marked where it stands.
+- The questions room: `spark ask` on the page -- at most three
+  questions the page does not answer, each one a link that asks
+  itself in the conversation.
+- The verdict stays the verdict: overview and part links run `spark
+  read`, the answer framed; a refusal is a first-class verdict. The
+  overview and parts record under the page's title in spark's
+  reading ledger, and the card says "asked before: N".
+- One room, one buffer: an answer page's next request replaces it
+  (W3m-control: DELETE_PREVBUF -- probed), so B from an answer is
+  the front room and B again is the page: two presses from any
+  depth. The cursor lands on the field (NEXT_LINK -- probed).
+- The family's quit grammar at the field: q, :q, quit and the rest
+  never reach the model.
+- The wait speaks: `reading N characters` the first time, `thinking`
+  after, spinner and seconds on the bottom row.
+- Probed and honestly out: a textarea's $EDITOR handoff hangs w3m
+  under a pty (the long-question room is parked); a headers-only
+  BACK response does not act; w3m renders no color from HTML.
+
 ## 2.0.1
 
 - The form fits an 80-column console: the field is 40 wide, so

@@ -1,37 +1,68 @@
 #!/bin/sh
 # spark-w3m -- the spark page for w3m: everything the reader touches is
 # a page, a link or a form field, drawn by w3m itself. Nothing is ever
-# written on w3m's screen from outside (two programs on one screen was
-# 1.x's whole disease), and nothing runs until the reader asks.
+# written on w3m's screen from outside but the bottom-row pulse, and
+# nothing runs until the reader asks. One room, one buffer: every
+# response to a request from an answer page replaces that page
+# (W3m-control: DELETE_PREVBUF -- probed 2026-09-14: works on a
+# GET-form chain), so the stack is always
+#   the page -> the front room -> the newest answer
+# and B twice from anywhere is the page you were reading.
 #
-#   --stash   M-s's first half (PIPE_BUF): the rendered page from stdin
-#             into a private stash file, nothing printed.
-#   --page    the local CGI (spark.cgi execs this): no question yet is
-#             the quiet spark page -- the page's opening words, the
-#             spark> form field, an overview link, part links past
-#             16000 chars. A submitted question runs `spark read` on
-#             the stash and answers as a page, the form repeated below
-#             for the follow-up. B walks back: answer, spark page, the
-#             page you were reading.
+#   --stash   M-s's first half (PIPE_BUF): the rendered page into a
+#             private stash; a thread is minted, the title kept
+#             (W3M_TITLE reaches this child -- probed), the old
+#             transcript cleared. Nothing printed.
+#   --page    the local CGI (spark.cgi execs this). No params is the
+#             quiet front room: the S (spark's own banner, first
+#             eight columns, read from the spark install at runtime;
+#             a pure-ASCII S when there is none or on the console),
+#             the card, hello, the chat> field, overview / questions /
+#             part links. Words are the CONVERSATION (spark edit ?
+#             --thread, the transcript kept beside the stash and
+#             re-rendered whole -- the page is the log). The empty
+#             q is the OVERVIEW and part=N one part (spark read, the
+#             verdict law, framed). ask= is the QUESTIONS room (spark
+#             ask: what the page does not answer; each question a
+#             link that asks itself). A quit word never reaches the
+#             model. The cursor lands on the field (W3m-control:
+#             NEXT_LINK -- probed).
 #   words     from a plain shell: any text on stdin, the answer out,
 #             stderr folded in, wrapped at spaces (SPARK_W3M_WIDTH,
 #             default 78).
 #
+# Probed and NOT used: a headers-only `W3m-control: BACK` response
+# does not act (the quit path renders a page instead); a textarea's
+# $EDITOR handoff hangs w3m under a pty (the long-question room is
+# parked, evidence in the 2.1.0 plan); GET carries the field's length
+# fine for a typed line -- if a wall ever shows, the chat form moves
+# to POST (local CGI POST arrives on stdin).
+#
 # What leaves the machine is unchanged: the rendered text and the
-# words, to the brain spark answers from -- no URL, no path. The stash
-# rests on this machine (0600, the user's runtime dir) so follow-ups
-# need no re-pipe; the next M-s replaces it.
+# words, to the brain spark answers from -- no URL, no path. The
+# stash, its thread, its title and its transcript rest on this
+# machine (0600, the user's runtime dir; replaced by the next M-s,
+# gone at logout).
 W=${SPARK_W3M_WIDTH:-78}
 STASH=${SPARK_W3M_STASH:-${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/spark-w3m-$(id -u)}
 PART_MAX=16000
+CGI="file:///cgi-bin/spark.cgi"
+ABOUT="a published page the reader is discussing with you -- not a draft to review"
 
 html() {
     sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
 }
 
-# The pulse, while the model reads: the bottom row, absolute
-# addressing, never a newline -- the one safe way to speak while w3m
-# waits for the page (proven in 1.2.0).
+urlenc() {
+    python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.quote_plus(sys.stdin.read().rstrip("\n")))'
+}
+
+urldec() {
+    python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.unquote_plus(sys.stdin.read()))'
+}
+
+# The pulse, on the one row this wrapper may touch: conversational and
+# truthful -- reading the page the first time, thinking after.
 pulse_start() {
     P_T0=$(date +%s)
     ( n=0
@@ -39,7 +70,7 @@ pulse_start() {
           case $((n % 4)) in
               0) f='|' ;; 1) f='/' ;; 2) f='-' ;; 3) f='\' ;;
           esac
-          printf '\033[9999;1H\033[2Kspark reads %s characters  %s %ss' \
+          printf '\033[9999;1H\033[2K%s  %s %ss' \
               "$1" "$f" "$(( $(date +%s) - P_T0 ))" > /dev/tty 2>/dev/null
           n=$((n + 1))
           sleep 0.25
@@ -53,75 +84,272 @@ pulse_stop() {
     printf '\033[9999;1H\033[2K' > /dev/tty 2>/dev/null
 }
 
-# the shared skirt of every spark page: the form, the overview link,
-# the part links when the stash is parts
-form_and_links() {
-    printf '<form action="file:///cgi-bin/spark.cgi" method="GET">\n'
-    printf 'spark&gt; <input type="text" name="q" size="40">\n'
-    printf '<input type="submit" name="go" value="ask"></form>\n'
-    printf '<p><a href="file:///cgi-bin/spark.cgi?q=">overview</a>'
-    if [ "$1" -gt "$PART_MAX" ]; then
-        parts=$(( ($1 + PART_MAX - 1) / PART_MAX ))
+# spark's face: the banner's first eight columns, read at runtime from
+# the spark install (the plugin repo stays ASCII); the pure-ASCII S on
+# the console or when no banner is found. SPARK_W3M_MASTHEAD=s|word|
+# none overrides.
+ascii_s() {
+    printf '#######+\n##+====+\n#######+\n+====##|\n#######|\n+======+\n'
+}
+
+masthead() {
+    case ${SPARK_W3M_MASTHEAD-} in
+        none) return 0 ;;
+        word) printf 'spark\n'; return 0 ;;
+    esac
+    if [ "${TERM-}" = linux ] || [ -n "${SPARK_ASCII-}" ]; then
+        ascii_s
+        return 0
+    fi
+    b=${XDG_CONFIG_HOME:-$HOME/.config}/spark/banner
+    if [ ! -f "$b" ]; then
+        bin=$(command -v spark 2>/dev/null) && link=$(readlink "$bin" 2>/dev/null) && {
+            case $link in /*) ;; *) link=${bin%/*}/$link ;; esac
+            repo=${link%/bin/spark}
+            b=$repo/home/.config/spark/banner
+        }
+    fi
+    if [ -f "$b" ]; then
+        sed 's/\\033\[[0-9;]*m//g' "$b" \
+            | python3 -c 'import sys; [print(l[:8]) for l in sys.stdin.read().splitlines() if l.strip()]'
+    else
+        ascii_s
+    fi
+}
+
+# the response head: content-type, the controls, the blank line --
+# controls go BEFORE the blank line (w3mmail.cgi is the reference)
+header() {
+    printf 'Content-Type: text/html\r\n'
+    for c in "$@"; do
+        printf 'W3m-control: %s\r\n' "$c"
+    done
+    printf '\r\n'
+}
+
+# the skirt every page wears: the chat form (hidden thread) and the
+# ways in. `skirt chat` stamps from=chat -- the next response then
+# replaces THIS page (an answer page); `skirt front` leaves it off,
+# so a request from the front room never deletes the front room.
+skirt() {
+    fr=
+    [ "${1-}" = chat ] && fr="&amp;from=chat"
+    printf '<form action="%s" method="GET">\n' "$CGI"
+    printf '<input type="hidden" name="t" value="%s">\n' "$T"
+    [ -z "$fr" ] || printf '<input type="hidden" name="from" value="chat">\n'
+    printf 'chat&gt; <input type="text" name="q" size="40">\n'
+    printf '<input type="submit" name="go" value="say"></form>\n'
+    printf '<p><a href="%s?q=&amp;t=%s%s">overview</a>' "$CGI" "$T" "$fr"
+    printf ' . <a href="%s?ask=1&amp;t=%s%s">questions</a>' "$CGI" "$T" "$fr"
+    if [ "$SIZE" -gt "$PART_MAX" ]; then
+        parts=$(( (SIZE + PART_MAX - 1) / PART_MAX ))
         i=1
         while [ "$i" -le "$parts" ]; do
-            printf ' . <a href="file:///cgi-bin/spark.cgi?part=%d">part %d</a>' "$i" "$i"
+            printf ' . <a href="%s?part=%d&amp;t=%s%s">part %d</a>' "$CGI" "$i" "$T" "$fr" "$i"
             i=$((i + 1))
         done
     fi
     printf '</p>\n'
 }
 
+footer() {
+    parts=$(( (SIZE + PART_MAX - 1) / PART_MAX ))
+    turns=0
+    [ -f "$STASH.chat" ] && turns=$(grep -c '^<p><b>chat' "$STASH.chat" 2>/dev/null || echo 0)
+    line="$SIZE chars"
+    [ "$parts" -gt 1 ] && line="$line . $parts parts"
+    [ "$turns" -gt 0 ] && line="$line . turn $turns"
+    line="$line . thread $T"
+    [ -z "${1-}" ] || line="$line . answered in ${1}s"
+    printf '<hr>\n<p>%s</p>\n' "$line"
+}
+
+wordmark() {
+    printf '<p><b>spark . %s</b></p>\n<hr>\n' "$(printf %s "$TITLE" | html)"
+}
+
+transcript() {
+    [ -f "$STASH.chat" ] && cat "$STASH.chat"
+}
+
+run_spark() {
+    # $1 = pulse label; the rest = the spark argv. Sets OUT, RC, SECS.
+    label=$1; shift
+    pulse_start "$label"
+    t0=$(date +%s)
+    OUT=$("$@" < "$STASH" 2>&1)
+    RC=$?
+    SECS=$(( $(date +%s) - t0 ))
+    pulse_stop
+}
+
 case ${1-} in
     --stash)
         umask 077
         cat > "$STASH"
+        printf 'w3m-%s-%s\n' "$(date +%s)" "$$" > "$STASH.thread"
+        printf '%s\n' "${W3M_TITLE-}" > "$STASH.name"
+        rm -f "$STASH.chat"
         exit 0
         ;;
     --page)
-        printf 'Content-Type: text/html\r\n\r\n'
-        printf '<html><head><title>spark</title></head><body>\n'
         if [ ! -s "$STASH" ]; then
-            printf '<p>no page stashed -- press M-s on a page first.</p></body></html>\n'
-            exit 0
-        fi
-        size=$(wc -c < "$STASH" | tr -d ' ')
-        # the query: q (the words, form-encoded) and part (a link)
-        q= ; part= ; asked=
-        old_ifs=$IFS; IFS='&'
-        for pair in ${QUERY_STRING-}; do
-            case $pair in
-                q=*)    asked=yes; q=${pair#q=} ;;
-                part=*) asked=yes; part=${pair#part=} ;;
-            esac
-        done
-        IFS=$old_ifs
-        q=$(printf %s "$q" | python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.unquote_plus(sys.stdin.read()))' 2>/dev/null)
-        opening=$(head -c 120 "$STASH" | tr '\n' ' ' | html)
-        if [ -z "$asked" ]; then
-            # the quiet page: nothing runs until the reader asks
-            printf '<p>the page: %s...</p>\n' "$opening"
-            form_and_links "$size"
-            printf '<p>Enter in the field asks; the overview link asks what the page covers; B goes back.</p>\n'
+            header
+            printf '<html><head><title>spark</title></head><body>\n'
+            printf '<table><tr><td><pre>%s</pre></td>\n' "$(ascii_s)"
+            printf '<td><p><b>spark</b></p><p>no page stashed -- press M-s on a page first.</p></td></tr></table>\n'
             printf '</body></html>\n'
             exit 0
         fi
-        case $q in "?"*) q=${q#?} ;; esac
-        set -f
-        set -- $q
-        set +f
+        SIZE=$(wc -c < "$STASH" | tr -d ' ')
+        T=$(cat "$STASH.thread" 2>/dev/null)
+        case $T in *[!A-Za-z0-9_-]*|"") T="w3m-0-0" ;; esac
+        TITLE=$(head -n 1 "$STASH.name" 2>/dev/null | tr -d '\r')
+        [ -n "$TITLE" ] || TITLE=$(head -n 1 "$STASH" | cut -c1-60)
+        q= ; part= ; rt= ; from= ; askroom= ; qset=
+        old_ifs=$IFS; IFS='&'
+        for pair in ${QUERY_STRING-}; do
+            case $pair in
+                q=*)    qset=yes; q=${pair#q=} ;;
+                part=*) part=${pair#part=} ;;
+                t=*)    rt=${pair#t=} ;;
+                from=*) from=${pair#from=} ;;
+                ask=*)  askroom=yes ;;
+            esac
+        done
+        IFS=$old_ifs
+        q=$(printf %s "$q" | urldec)
         case $part in *[!0-9]*) part= ;; esac
-        [ -z "$part" ] || set -- --part "$part" "$@"
-        pulse_start "$size"
-        out=$(spark read "$@" < "$STASH" 2>&1)
-        rc=$?
-        pulse_stop
-        printf '<p>spark&gt; %s</p>\n' "$(printf %s "${part:+--part $part }$q" | html)"
-        if [ $rc -eq 0 ]; then
-            printf '<pre>%s</pre>\n' "$(printf '%s\n' "$out" | fold -s -w "$W" | html)"
-        else
-            printf '<p><b>%s</b></p>\n' "$(printf %s "$out" | html)"
+        case $rt in *[!A-Za-z0-9_-]*) rt= ;; esac
+        set -- ; [ "$from" = chat ] && set -- DELETE_PREVBUF
+        # a form from a page that predates the newest M-s: run nothing
+        if [ -n "$rt" ] && [ "$rt" != "$T" ]; then
+            header "$@"
+            printf '<html><head><title>spark</title></head><body>\n'
+            wordmark
+            printf '<p><b>the stash has moved on -- press M-s on the page again.</b></p>\n'
+            printf '</body></html>\n'
+            exit 0
         fi
-        form_and_links "$size"
+        # the family's quit grammar: a quit word never reaches the model
+        case $q in
+            q|/q|/quit|/exit|:q|:quit|:wq|quit|exit|bye)
+                header "$@" NEXT_LINK
+                printf '<html><head><title>spark</title></head><body>\n'
+                wordmark
+                transcript
+                printf '<p>B goes back to the page -- a quit word never reaches spark.</p>\n'
+                skirt chat
+                footer
+                printf '</body></html>\n'
+                exit 0
+                ;;
+        esac
+        if [ -n "$askroom" ]; then
+            # the questions room: what does this page not answer?
+            # (spark ask refuses over 12000 chars outright, so a long
+            # stash is cut to its first 12 kB here, and the page says so)
+            pulse_start "reading $SIZE characters"
+            t0=$(date +%s)
+            if [ -n "$TITLE" ]; then
+                OUT=$(head -c 12000 "$STASH" | spark ask --name "$TITLE" 2>&1)
+            else
+                OUT=$(head -c 12000 "$STASH" | spark ask 2>&1)
+            fi
+            RC=$?
+            SECS=$(( $(date +%s) - t0 ))
+            pulse_stop
+            header "$@" NEXT_LINK
+            printf '<html><head><title>spark</title></head><body>\n'
+            wordmark
+            printf '<p><b>what this page does not answer</b></p>\n'
+            if [ $RC -eq 0 ]; then
+                printf '<ol>\n'
+                printf '%s\n' "$OUT" | while IFS= read -r ql; do
+                    [ -n "$ql" ] || continue
+                    enc=$(printf %s "$ql" | urlenc)
+                    printf '<li><a href="%s?q=%s&amp;t=%s&amp;from=chat">%s</a></li>\n' \
+                        "$CGI" "$enc" "$T" "$(printf %s "$ql" | html)"
+                done
+                printf '</ol>\n'
+                printf '<p>each question is a link -- follow one to ask it in the conversation.</p>\n'
+            else
+                printf '<p><b>%s</b></p>\n' "$(printf %s "$OUT" | html)"
+            fi
+            [ "$SIZE" -gt 12000 ] && printf '<p>questions from the first 12 kB.</p>\n'
+            skirt chat
+            footer "$SECS"
+            printf '</body></html>\n'
+            exit 0
+        fi
+        if [ -n "$part" ] || { [ -n "$qset" ] && [ -z "$q" ]; }; then
+            # the verdict law: the overview, or one part -- framed.
+            # --name records the ask in read's ledger (the card counts it)
+            if [ -n "$part" ]; then
+                run_spark "reading $SIZE characters" spark read --part "$part" ${TITLE:+--name "$TITLE"}
+                head_line="part $part"
+            else
+                run_spark "reading $SIZE characters" spark read ${TITLE:+--name "$TITLE"}
+                head_line="overview"
+            fi
+            header "$@" NEXT_LINK
+            printf '<html><head><title>spark</title></head><body>\n'
+            wordmark
+            printf '<p><b>%s</b></p>\n' "$head_line"
+            printf '<table border="1"><tr><td><pre>%s</pre></td></tr></table>\n' \
+                "$(printf '%s\n' "$OUT" | fold -s -w "$W" | html)"
+            skirt chat
+            footer "$SECS"
+            printf '</body></html>\n'
+            exit 0
+        fi
+        if [ -n "$qset" ]; then
+            # the conversation law: spark edit ? with the thread; the
+            # page is the log, re-rendered whole each turn
+            case $q in "?"*) q=${q#?} ;; esac
+            label="reading $SIZE characters"
+            [ -f "$STASH.chat" ] && label="thinking"
+            set -f
+            set -- '?' $q --thread "$T" --about "$ABOUT"
+            set +f
+            [ -z "$TITLE" ] || set -- "$@" --name "$TITLE"
+            saved_controls=$from
+            run_spark "$label" spark edit "$@"
+            umask 077
+            {
+                printf '<p><b>chat&gt;</b> %s</p>\n' "$(printf %s "$q" | html)"
+                printf '<pre>%s</pre>\n' "$(printf '%s\n' "$OUT" | fold -s -w "$W" | html)"
+            } >> "$STASH.chat"
+            set -- ; [ "$saved_controls" = chat ] && set -- DELETE_PREVBUF
+            header "$@" NEXT_LINK
+            printf '<html><head><title>spark</title></head><body>\n'
+            wordmark
+            transcript
+            skirt chat
+            footer "$SECS"
+            printf '</body></html>\n'
+            exit 0
+        fi
+        # the quiet front room: nothing runs; with a transcript, the
+        # room remembers
+        asked=
+        if command -v spark >/dev/null 2>&1 && [ -n "$TITLE" ]; then
+            n=$(spark read --ledger --name "$TITLE" 2>/dev/null | grep -c . || true)
+            [ "${n:-0}" -gt 0 ] 2>/dev/null && asked="$n"
+        fi
+        header NEXT_LINK
+        printf '<html><head><title>spark</title></head><body>\n'
+        printf '<table><tr><td><pre>%s</pre></td><td>\n' "$(masthead)"
+        printf '<p><b>%s</b></p>\n' "$(printf %s "$TITLE" | html)"
+        printf '<p>"%s..."</p>\n' "$(head -c 160 "$STASH" | tr '\n' ' ' | html)"
+        [ -z "$asked" ] || printf '<p>asked before: %s</p>\n' "$asked"
+        printf '<p>hello %s -- let'"'"'s talk about it.</p>\n' "${USER:-there}"
+        printf '</td></tr></table>\n'
+        transcript
+        skirt front
+        printf '<p>words talk it over; overview says what the page covers; questions\n'
+        printf 'asks what it does not answer; q or B returns to the page.</p>\n'
+        footer
         printf '</body></html>\n'
         exit 0
         ;;

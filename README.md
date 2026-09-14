@@ -2,28 +2,35 @@
 
 spark (https://spark.forgewright.ai) is your own AI on your own machine;
 this plugin puts it under one key in w3m. `M-s` (Esc then s) stashes
-the page you are reading and opens the spark page -- a page like any
-other, drawn by w3m itself: a `spark> ` form field, an `overview`
-link, part links when the page is long. Nothing runs until you ask.
-The answer says only what the page says -- every line quotes it, and
-the quote is checked; a claim the page does not hold never reaches
-you. The first client of `spark read`.
+the page you are reading and opens the spark page -- a small place
+drawn by w3m itself, wearing spark's own S beside the page's card.
+Nothing runs until you ask, and `B` always walks back sanely.
 
-    spark> [field]     your question: type, Enter, ask ("does it
-                       mention prices"; a leading ? works too)
-    overview           a link: what does this page cover?
+    chat> [field]      the conversation: follow-ups ride the thread
+                       ("can you translate that?" has a that), the
+                       page re-renders as the whole log, and a quote
+                       the page does not hold is marked
+                       [not in the text], never silenced
+    overview           a link: what does this page cover? -- the
+                       verdict law: every line quotes the page, or an
+                       honest refusal, in a frame
+    questions          a link: what does this page NOT answer? -- at
+                       most three, and each question is itself a link
+                       that asks it in the conversation
     part 1 . part 2    links, on a page past 16 kB: read one part
-    B                  never mind -- back to the page you were reading
+    q, :q, quit...     said to the field: toward the page -- a quit
+                       word never reaches the model
+    B                  from an answer, the front room; again, the
+                       page itself -- two presses from any depth
 
-The answer is a page too, the field repeated below it for the
-follow-up. When the page does not answer, the reply is one line
-showing its own opening words -- never a guess. While the model
-reads, the bottom row says so: `spark reads N characters | 12s`.
+While the model works, the bottom row says so: `reading N characters
+| 12s` the first time, `thinking | 6s` on the turns after. The card
+counts what was asked of this page before (spark's reading ledger).
 
 ## Install
 
-You need spark 1.20 or newer on this machine (`spark read -h`
-answers), and w3m 0.5.3 or newer (`w3m -version`). Then:
+You need spark 1.20 or newer on this machine (`spark read -h` and
+`spark ask -h` answer), and w3m 0.5.3 or newer (`w3m -version`). Then:
 
 ```sh
 git clone https://github.com/forgewright-ai/spark-w3m ~/.w3m/spark
@@ -42,14 +49,22 @@ is the help; M-s is a suggestion (w3m's own M-s, save buffer, moves
 aside) -- edit the line to taste. The keys, and what to ask:
 `CHEATSHEET.md`.
 
+The masthead is spark's own banner, read from your local spark
+install at runtime (`~/.config/spark/banner`, else the spark clone)
+-- the first eight columns, the S. On the Linux console, or when no
+banner is found, a plain-ASCII S stands in;
+`SPARK_W3M_MASTHEAD=s|word|none` overrides.
+
 ## What leaves this machine
 
-The rendered page text -- 16 kB a part -- and your words, and only to
-the brain spark is configured for. No URL and no file name travels.
-The stashed text rests on this machine between question and follow-up
-(one file, 0600, your runtime directory; the next M-s replaces it).
-Every run is one call to `spark read`; the plugin never speaks HTTP
-for itself and never sees a token.
+The rendered page text -- 16 kB a part, 12 kB to the questions room
+-- and your words, and only to the brain spark is configured for. No
+URL and no file name travels. The stash, its thread, its title and
+its transcript rest on this machine between question and follow-up
+(files of yours alone, 0600, your runtime directory; the next M-s
+replaces them, logout removes them). Every run is one call to `spark
+edit`, `spark read` or `spark ask`; the plugin never speaks HTTP for
+itself and never sees a token.
 
 ## Contributing
 

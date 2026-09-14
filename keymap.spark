@@ -1,25 +1,29 @@
 # spark in w3m -- your own AI, on your own machine (spark.forgewright.ai).
 # Append this to your own ~/.w3m/keymap (and cgi_bin to ~/.w3m/config;
-# the README's three install lines do both):
+# the README's four install lines do both):
 #
 #     cat ~/.w3m/spark/keymap.spark >> ~/.w3m/keymap
 #
 # One key, spark's key in every app: M-s (Esc then s). The page you
-# are reading is stashed and the spark page opens -- a page like any
-# other, drawn by w3m itself:
+# are reading is stashed and the spark page opens -- a small place,
+# drawn by w3m itself, wearing spark's own S:
 #
-#   spark> [field]     your question: type, Enter, ask ("does it
-#                      mention prices"; a leading ? works too)
-#   overview           a link: what does this page cover?
+#   chat> [field]      the conversation: type, Enter, then [say] --
+#                      follow-ups ride the same thread, and the page
+#                      re-renders as the whole log
+#   overview           a link: what does this page cover? (every line
+#                      quotes the page, or an honest refusal, framed)
+#   questions          a link: what does this page NOT answer? each
+#                      question is a link that asks itself
 #   part 1 . part 2    links, on a page past 16 kB: read one part
-#   B                  never mind -- back to the page you were reading
+#   q (or :q, quit)    said to the field: back toward the page -- a
+#                      quit word never reaches the model
+#   B                  never mind, anywhere: B from an answer is the
+#                      front room, B again is the page itself
 #
-# The answer is a page too, every line quoting the source, the field
-# repeated below it for the follow-up; when the page does not answer,
-# the reply is one line showing its own opening words -- never a
-# guess. Nothing leaves this machine but the rendered page text and
-# your words, to the brain spark is configured for -- no URL, no
-# path. Needs w3m 0.5.3 or newer and spark 1.20 or newer. M-s is a
-# suggestion (w3m's own M-s, save buffer, moves aside) -- edit the
-# line to taste.
-keymap M-s COMMAND "PIPE_BUF 'spark-w3m --stash'; GOTO file:///cgi-bin/spark.cgi"
+# Nothing runs until you ask. Nothing leaves this machine but the
+# rendered page text and your words, to the brain spark is configured
+# for -- no URL, no path. Needs w3m 0.5.3 or newer and spark 1.20 or
+# newer (spark ask -h answers). M-s is a suggestion (w3m's own M-s,
+# save buffer, moves aside) -- edit the line to taste.
+keymap M-s COMMAND "PIPE_BUF 'spark-w3m --stash'; BACK; GOTO file:///cgi-bin/spark.cgi"

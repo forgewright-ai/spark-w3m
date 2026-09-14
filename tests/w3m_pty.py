@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-# w3m_pty.py -- the spark keymap inside a real w3m, in a pty, against a
+# w3m_pty.py -- the spark page inside a real w3m, in a pty, against a
 # stub `spark` (on PATH: the wrapper says `spark` plainly, and that is
 # what must be proven) that logs what it was asked and answers a fixed
-# word. Proves the whole loop the snippet promises: M-s pipes the
-# RENDERED page (never the HTML) through `spark-w3m` into a new buffer,
-# M-a opens w3m's pipe prompt for a question, the words reach `spark
-# read` with the page on stdin and no path, and a refusal on spark's
-# stderr still shows in the buffer (the wrapper folds it in). The test
-# performs the README's install lines: the repo's keymap.spark is
-# appended to a throwaway ~/.w3m/keymap and the wrapper is put on PATH.
-# Skips (exit 0) without w3m.
+# word. Proves the loop the snippet promises: M-s stashes the RENDERED
+# page (never the HTML) and opens the quiet spark page -- a form field,
+# an overview link, part links past 16000 chars -- where nothing runs
+# until the reader asks; a question (typed, or a link) runs `spark
+# read` on the stash and answers as a page carrying the form again; a
+# refusal shows on the page. The test performs the README's install
+# lines: keymap.spark appended to a throwaway ~/.w3m/keymap, cgi_bin
+# written to ~/.w3m/config, the wrapper on PATH. Skips (exit 0)
+# without w3m. w3m draws word by word in a pty: expectations match ONE
+# token.
 #
 #   python3 tests/w3m_pty.py
 
@@ -19,6 +21,7 @@ import re
 import pty
 import select
 import shutil
+import stat
 import struct
 import subprocess
 import sys
@@ -85,9 +88,9 @@ class Browser:
             self.read(0.2)
         return False
 
-    def send(self, s):
+    def send(self, s, wait=0.5):
         os.write(self.fd, s.encode())
-        time.sleep(0.3)
+        time.sleep(wait)
 
     def mark(self):
         self.pos = len(self.buf)
@@ -95,6 +98,10 @@ class Browser:
     def close(self):
         try:
             os.close(self.fd)
+        except OSError:
+            pass
+        try:
+            os.kill(self.pid, 15)
         except OSError:
             pass
         try:
@@ -120,28 +127,31 @@ def main():
         work, bindir = [os.path.join(tmp, d) for d in ("work", "bin")]
         os.makedirs(work)
         os.makedirs(bindir)
-        # the README's install lines, performed: the snippet appended to a
-        # fresh ~/.w3m/keymap, the wrapper on PATH
+        # the README's install lines, performed: the snippet appended to
+        # a fresh ~/.w3m/keymap, cgi_bin into ~/.w3m/config, the wrapper
+        # on PATH as shipped (no chmod: the repo files must already be
+        # executable, or this test must fail the way the box once did)
         os.makedirs(os.path.join(tmp, ".w3m"))
         with open(os.path.join(REPO, "keymap.spark")) as f:
             snippet = f.read()
         with open(os.path.join(tmp, ".w3m", "keymap"), "a") as f:
             f.write(snippet)
-        # the README's ln -s, performed as shipped: no chmod here -- the
-        # repo file must already be executable, or this test must fail
-        # the way the box did
+        with open(os.path.join(tmp, ".w3m", "config"), "w") as f:
+            f.write("cgi_bin %s\n" % PLUGIN)
         os.symlink(os.path.join(REPO, "spark-w3m"), os.path.join(bindir, "spark-w3m"))
         stub = os.path.join(bindir, "spark")
         with open(stub, "w") as f:
             f.write(STUB)
         os.chmod(stub, 0o755)
         log = os.path.join(tmp, "stub.log")
+        stash = os.path.join(tmp, "stash")
         page = os.path.join(work, "page.html")
         with open(page, "w") as f:
             f.write(PAGE)
         env = {"HOME": tmp, "TERM": "xterm-256color",
                "PATH": bindir + ":" + os.environ.get("PATH", "/usr/bin:/bin"),
-               "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "STUB_LOG": log}
+               "LANG": "C.UTF-8", "LC_ALL": "C.UTF-8", "STUB_LOG": log,
+               "SPARK_W3M_STASH": stash}
         argv = [w3m, "page.html"]
 
         def logged():
@@ -151,121 +161,107 @@ def main():
             except OSError:
                 return ""
 
-        def fresh():
-            if os.path.exists(log):
-                os.unlink(log)
-            b = Browser(argv, env, work)
-            ok(b.expect("The gate"), "w3m draws the page")
+        def fresh(doc="page.html", token="gate"):
+            for p in (log, log + ".stdin", stash):
+                if os.path.exists(p):
+                    os.unlink(p)
+            b = Browser([w3m, doc], env, work)
+            ok(b.expect(token), "w3m draws the page")
             b.mark()
             return b
 
-        # A. M-s opens the spark prompt; Enter alone is the overview
+        def spark_page(b):
+            b.send("\x1bs", 1.5)
+            return b.expect("spark>")
+
+        # A. M-s stashes the page and opens the QUIET spark page:
+        # form, overview link, nothing run
         b = fresh()
-        b.send("\x1bs")
-        ok(b.expect("spark>"), "M-s opens the spark prompt on screen", b.plain()[-200:])
-        ok(b"\x1b[9999;1H\x1b[2Kspark> " in b.buf,
-           "the prompt homes to the screen's last row, not over the page",
-           repr(b.buf[-120:]))
-        b.send("\r")
-        ok(b.expect("characters"), "the pulse names the page's size on the bottom row", b.plain()[-200:])
-        ok(b.expect("STUB-READ"), "Enter alone is the overview: the answer opens in a buffer", b.plain()[-300:])
+        ok(spark_page(b), "M-s opens the spark page", b.plain()[-200:])
+        ok(b.expect("overview"), "the overview link is on it")
+        ok(b.expect("ask"), "the form's ask button is on it")
+        with open(stash) as f:
+            st = f.read()
+        ok("Tickets are two dollars" in st and "<p>" not in st,
+           "the RENDERED page is stashed, not the HTML", repr(st[:120]))
+        ok(stat.S_IMODE(os.stat(stash).st_mode) == 0o600, "the stash is 0600")
+        ok(not os.path.exists(log), "the quiet page runs nothing unasked")
+        b.close()
+
+        # B. the overview link asks what the page covers; the answer is
+        # a page carrying the form again; the stash travelled, no path
+        b = fresh()
+        spark_page(b)
+        b.send("\t"); b.send("\t"); b.send("\t")
+        b.mark()
+        b.send("\r", 1.5)
+        ok(b.expect("STUB-READ"), "the overview link answers in a page", b.plain()[-300:])
         got = logged()
         ok(got.strip() == "read", "spark read got no words -- the overview, no name, no path", got)
-        ok(work not in got and "page.html" not in got, "the page's path never reaches spark", got)
         with open(log + ".stdin") as f:
             stdin = f.read()
-        ok("Tickets are two dollars" in stdin and "<p>" not in stdin,
-           "the RENDERED text travelled on stdin, not the HTML", repr(stdin[:120]))
-        b.send("B")                 # back to the page
-        b.send("Q")                 # quit, no confirmation
-        b.read(1.0)
-        b.close()
-
-        # B. words at the prompt are the question; glob characters stay
-        # literal (the wrapper word-splits under set -f); a backspace
-        # edits, and the raw reader echoes NO newline for the Enter --
-        # a newline on the bottom row scrolls the screen under w3m
-        b = fresh()
-        b.send("\x1bs")
-        b.expect("spark>")
-        b.send("does it mention *prices*X\x7f\r")
-        ok(b.expect("STUB-READ"), "words run the question: the answer opens in a buffer", b.plain()[-300:])
-        ok(logged().strip() == "read does it mention *prices*",
-           "spark read got exactly the words, globs literal, backspace edits", logged())
-        i = b.buf.find(b"*prices*X")
-        ok(i > 0 and b"\n" not in b.buf[i:i + 40].split(b"STUB", 1)[0].replace(b"\x1b[2K", b""),
-           "the Enter is swallowed: no newline echoed on the bottom row",
-           repr(b.buf[i:i + 60]))
-        b.send("B")
-        b.send("Q")
-        b.read(1.0)
-        b.close()
-
-        # C. the editors' habit and the flags: a leading ? is stripped,
-        # --part rides to spark read
-        b = fresh()
-        b.send("\x1bs")
-        b.expect("spark>")
-        b.send("? is this clear\r")
-        b.expect("STUB-READ")
-        ok(logged().strip() == "read is this clear", "a leading ? is stripped, the editors' habit", logged())
-        b.send("B")
-        b.send("Q")
-        b.read(1.0)
-        b.close()
-        b = fresh()
-        b.send("\x1bs")
-        b.expect("spark>")
-        b.send("--part 2 what repeats about gates\r")
-        b.expect("STUB-READ")
-        ok(logged().strip() == "read --part 2 what repeats about gates",
-           "flags typed at the prompt ride to spark read", logged())
-        b.send("B")
-        b.send("Q")
-        b.read(1.0)
-        b.close()
-
-        # D. a refusal on spark's stderr still shows in the buffer: the
-        # wrapper folds stderr into the answer. Match ONE token: w3m
-        # draws a line word by word, each with its own cursor move
-        b = fresh()
-        b.send("\x1bs")
-        b.expect("spark>")
-        b.send("fail\r")
-        ok(b.expect("STUB-OPENING"), "a refusal shows in the buffer, not lost on stderr", b.plain()[-300:])
-        b.send("B")
-        b.send("Q")
-        b.read(1.0)
-        b.close()
-
-        # E. Ctrl-C at the prompt is never mind: nothing runs, w3m lives
-        b = fresh()
-        b.send("\x1bs")
-        b.expect("spark>")
-        b.send("\x03")
-        time.sleep(0.6)
-        ok(not os.path.exists(log), "Ctrl-C at the prompt runs nothing")
+        ok("Tickets" in stdin and tmp not in got, "the stash travelled on stdin; no path in argv", repr(stdin[:120]))
+        ok(b.expect("ask"), "the answer page carries the form: the follow-up lives there")
         b.mark()
-        b.send("B")                 # back: the page is still there
-        ok(b.expect("gate"), "B returns to the page after the cancel", b.plain()[-200:])
-        b.send("Q")
-        b.read(1.0)
+        b.send("B", 1.0)
+        ok(b.expect("overview"), "B walks back to the spark page", b.plain()[-200:])
         b.close()
 
-        # D. long lines wrap at spaces before w3m sees them (the wrapper's
-        # fold): w3m shows piped text as it comes, one long line otherwise
-        long_out = subprocess.run([os.path.join(bindir, "spark-w3m"), "long"],
-                                  input=b"x", env=env, cwd=work,
-                                  stdout=subprocess.PIPE).stdout.decode()
-        ok(long_out.strip() and all(len(l) <= 78 for l in long_out.splitlines())
-           and not any(l.endswith("wrapwo") for l in long_out.splitlines()),
-           "a long answer wraps at spaces, at most 78 columns", repr(long_out[:100]))
+        # C. words typed into the field are the question; a leading ?
+        # is stripped, the editors' habit
+        b = fresh()
+        spark_page(b)
+        b.send("\t")
+        b.send("\r", 0.8)
+        b.send("?does it mention prices", 0.6)
+        b.send("\r", 0.8)
+        b.send("\t")
+        b.send("\r", 1.5)
+        ok(b.expect("STUB-READ"), "a typed question answers in a page", b.plain()[-300:])
+        ok(logged().strip() == "read does it mention prices",
+           "the words reach spark read, the leading ? stripped", logged())
+        b.close()
 
-        # E. the page on disk is untouched (a reader never writes)
-        with open(page) as f:
-            ok(f.read() == PAGE, "the page on disk is untouched")
+        # D. a page past 16000 chars: part links on the spark page; a
+        # part link reads that part
+        big = os.path.join(work, "big.html")
+        with open(big, "w") as f:
+            f.write("<html><body><p>bigword " + "filler " * 3500 + "</p></body></html>")
+        b = fresh("big.html", "bigword")
+        spark_page(b)
+        ok(b.expect("part"), "part links on a long page", b.plain()[-200:])
+        for _ in range(5):
+            b.send("\t")
+        b.send("\r", 1.5)
+        ok(b.expect("STUB-READ") and logged().strip() == "read --part 2",
+           "the part 2 link reads part 2", logged())
+        b.close()
 
-    print("w3m_pty: %s" % ("all ok" if not fail else "%d FAILED" % fail))
+        # E. a refusal on spark's stderr shows on the answer page
+        b = fresh()
+        spark_page(b)
+        b.send("\t")
+        b.send("\r", 0.8)
+        b.send("fail", 0.5)
+        b.send("\r", 0.8)
+        b.send("\t")
+        b.send("\r", 1.5)
+        ok(b.expect("STUB-OPENING"), "a refusal shows on the page, not lost on stderr", b.plain()[-300:])
+        b.close()
+
+        # F. from a plain shell the wrapper takes the words directly,
+        # and a long answer wraps at spaces
+        if os.path.exists(log):
+            os.unlink(log)
+        p = subprocess.run([os.path.join(bindir, "spark-w3m"), "long"],
+                           input="body\n", capture_output=True, text=True, env=env)
+        ok(p.returncode == 0 and all(len(l) <= 78 for l in p.stdout.splitlines()),
+           "pipe mode: a long answer wraps at spaces, at most 78 columns", p.stdout[:100])
+        ok(logged().strip() == "read long", "pipe mode passes the words", logged())
+
+        ok(not os.path.exists(os.path.join(REPO, "stub.log")), "the repo tree is untouched")
+
+    print("w3m_pty: %s" % ("all ok" if fail == 0 else "%d FAILED" % fail))
     return 1 if fail else 0
 
 

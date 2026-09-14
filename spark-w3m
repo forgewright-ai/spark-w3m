@@ -1,21 +1,37 @@
 #!/bin/sh
-# spark-w3m -- `spark read` for a w3m buffer: stderr folded into stdout,
-# so the refusal a source earns ("the source does not answer -- it
-# opens: ...", or the part count of a long page) shows in w3m's pipe
-# buffer instead of vanishing; and long lines wrapped at spaces, because
-# w3m shows piped text as it comes. SPARK_W3M_WIDTH sets the wrap
-# column (default 78).
+# spark-w3m -- the spark page for w3m: everything the reader touches is
+# a page, a link or a form field, drawn by w3m itself. Nothing is ever
+# written on w3m's screen from outside (two programs on one screen was
+# 1.x's whole disease), and nothing runs until the reader asks.
 #
-# --ask is the key's mode (keymap M-s): the spark prompt on the
-# terminal while w3m waits, the page still on stdin. Enter or ? alone
-# is the overview; words (a leading ?, the editors' habit, stripped)
-# are the question, flags like --part 2 ride along; Ctrl-C is never
-# mind. The words never glob (set -f) and never touch the page.
-# The pulse, on the one row this wrapper may touch (the bottom row,
-# absolute addressing, never a newline -- a scroll shifts every later
-# w3m repaint one off): the page's size, an ASCII spinner, the
-# seconds. w3m shows the answer buffer only when the pipe ends, so the
-# spinner runs the whole wait and the row is cleared at the end.
+#   --stash   M-s's first half (PIPE_BUF): the rendered page from stdin
+#             into a private stash file, nothing printed.
+#   --page    the local CGI (spark.cgi execs this): no question yet is
+#             the quiet spark page -- the page's opening words, the
+#             spark> form field, an overview link, part links past
+#             16000 chars. A submitted question runs `spark read` on
+#             the stash and answers as a page, the form repeated below
+#             for the follow-up. B walks back: answer, spark page, the
+#             page you were reading.
+#   words     from a plain shell: any text on stdin, the answer out,
+#             stderr folded in, wrapped at spaces (SPARK_W3M_WIDTH,
+#             default 78).
+#
+# What leaves the machine is unchanged: the rendered text and the
+# words, to the brain spark answers from -- no URL, no path. The stash
+# rests on this machine (0600, the user's runtime dir) so follow-ups
+# need no re-pipe; the next M-s replaces it.
+W=${SPARK_W3M_WIDTH:-78}
+STASH=${SPARK_W3M_STASH:-${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/spark-w3m-$(id -u)}
+PART_MAX=16000
+
+html() {
+    sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
+}
+
+# The pulse, while the model reads: the bottom row, absolute
+# addressing, never a newline -- the one safe way to speak while w3m
+# waits for the page (proven in 1.2.0).
 pulse_start() {
     P_T0=$(date +%s)
     ( n=0
@@ -24,7 +40,7 @@ pulse_start() {
               0) f='|' ;; 1) f='/' ;; 2) f='-' ;; 3) f='\' ;;
           esac
           printf '\033[9999;1H\033[2Kspark reads %s characters  %s %ss' \
-              "$1" "$f" "$(( $(date +%s) - P_T0 ))" > /dev/tty
+              "$1" "$f" "$(( $(date +%s) - P_T0 ))" > /dev/tty 2>/dev/null
           n=$((n + 1))
           sleep 0.25
       done ) 2>/dev/null &
@@ -34,51 +50,80 @@ pulse_start() {
 pulse_stop() {
     [ -z "${PULSE-}" ] || kill "$PULSE" 2>/dev/null
     PULSE=
-    printf '\033[9999;1H\033[2K' > /dev/tty
+    printf '\033[9999;1H\033[2K' > /dev/tty 2>/dev/null
+}
+
+# the shared skirt of every spark page: the form, the overview link,
+# the part links when the stash is parts
+form_and_links() {
+    printf '<form action="file:///cgi-bin/spark.cgi" method="GET">\n'
+    printf 'spark&gt; <input type="text" name="q" size="60">\n'
+    printf '<input type="submit" name="go" value="ask"></form>\n'
+    printf '<p><a href="file:///cgi-bin/spark.cgi?q=">overview</a>'
+    if [ "$1" -gt "$PART_MAX" ]; then
+        parts=$(( ($1 + PART_MAX - 1) / PART_MAX ))
+        i=1
+        while [ "$i" -le "$parts" ]; do
+            printf ' . <a href="file:///cgi-bin/spark.cgi?part=%d">part %d</a>' "$i" "$i"
+            i=$((i + 1))
+        done
+    fi
+    printf '</p>\n'
 }
 
 case ${1-} in
-    --ask)
-        old=$(stty -g < /dev/tty 2>/dev/null || true)
-        # Ctrl-C cancels: w3m stops reading its stream on the same
-        # SIGINT, so no goodbye line can land in the buffer -- the
-        # empty buffer is the cancel, and B goes back. Restore the tty.
-        trap '[ -z "${PULSE-}" ] || kill "$PULSE" 2>/dev/null; [ -z "$old" ] || stty "$old" < /dev/tty; exit 130' INT
-        # w3m leaves the cursor anywhere (top-left on the console, over
-        # the page's first line); put the prompt on the screen's last
-        # row -- row 9999 clamps to the bottom -- and clear that row.
-        # The keys are read raw and echoed by hand, and Enter is
-        # swallowed: a newline echoed on the bottom row scrolls the
-        # whole screen, and w3m, not knowing, then repaints every row
-        # one off. No byte but the typed characters reaches the tty.
-        [ -z "$old" ] || stty -icanon -echo min 1 time 0 < /dev/tty
-        printf '\033[9999;1H\033[2Kspark> ' > /dev/tty
-        q=
-        while :; do
-            c=$(dd bs=1 count=1 2>/dev/null < /dev/tty)
-            case $c in
-                ""|"$(printf '\r')") break ;;
-                "$(printf '\003')")
-                    printf '\033[2K\033[9999;1H' > /dev/tty
-                    [ -z "$old" ] || stty "$old" < /dev/tty
-                    exit 130 ;;
-                "$(printf '\177')"|"$(printf '\b')")
-                    [ -z "$q" ] || { q=${q%?}; printf '\b \b' > /dev/tty; } ;;
-                *) q="$q$c"; printf %s "$c" > /dev/tty ;;
+    --stash)
+        umask 077
+        cat > "$STASH"
+        exit 0
+        ;;
+    --page)
+        printf 'Content-Type: text/html\r\n\r\n'
+        printf '<html><head><title>spark</title></head><body>\n'
+        if [ ! -s "$STASH" ]; then
+            printf '<p>no page stashed -- press M-s on a page first.</p></body></html>\n'
+            exit 0
+        fi
+        size=$(wc -c < "$STASH" | tr -d ' ')
+        # the query: q (the words, form-encoded) and part (a link)
+        q= ; part= ; asked=
+        old_ifs=$IFS; IFS='&'
+        for pair in ${QUERY_STRING-}; do
+            case $pair in
+                q=*)    asked=yes; q=${pair#q=} ;;
+                part=*) asked=yes; part=${pair#part=} ;;
             esac
         done
-        printf '\033[2K\033[9999;1H' > /dev/tty
-        [ -z "$old" ] || stty "$old" < /dev/tty
+        IFS=$old_ifs
+        q=$(printf %s "$q" | python3 -c 'import sys, urllib.parse; sys.stdout.write(urllib.parse.unquote_plus(sys.stdin.read()))' 2>/dev/null)
+        opening=$(head -c 120 "$STASH" | tr '\n' ' ' | html)
+        if [ -z "$asked" ]; then
+            # the quiet page: nothing runs until the reader asks
+            printf '<p>the page: %s...</p>\n' "$opening"
+            form_and_links "$size"
+            printf '<p>Enter in the field asks; the overview link asks what the page covers; B goes back.</p>\n'
+            printf '</body></html>\n'
+            exit 0
+        fi
         case $q in "?"*) q=${q#?} ;; esac
         set -f
         set -- $q
         set +f
-        page=$(cat)
-        pulse_start "$(printf %s "$page" | wc -c | tr -d ' ')"
-        printf '%s\n' "$page" | spark read "$@" 2>&1 | fold -s -w "${SPARK_W3M_WIDTH:-78}"
+        case $part in *[!0-9]*) part= ;; esac
+        [ -z "$part" ] || set -- --part "$part" "$@"
+        pulse_start "$size"
+        out=$(spark read "$@" < "$STASH" 2>&1)
+        rc=$?
         pulse_stop
-        trap - INT
+        printf '<p>spark&gt; %s</p>\n' "$(printf %s "${part:+--part $part }$q" | html)"
+        if [ $rc -eq 0 ]; then
+            printf '<pre>%s</pre>\n' "$(printf '%s\n' "$out" | fold -s -w "$W" | html)"
+        else
+            printf '<p><b>%s</b></p>\n' "$(printf %s "$out" | html)"
+        fi
+        form_and_links "$size"
+        printf '</body></html>\n'
         exit 0
         ;;
 esac
-spark read "$@" 2>&1 | fold -s -w "${SPARK_W3M_WIDTH:-78}"
+spark read "$@" 2>&1 | fold -s -w "$W"

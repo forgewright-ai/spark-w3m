@@ -38,12 +38,12 @@ fi
 
 # --- 2. syntax ------------------------------------------------------------
 python3 -m py_compile tests/*.py || bad "python syntax"
-sh -n spark-w3m || bad "spark-w3m: not POSIX sh"; if grep -qvE '^(#|$|keymap )' keymap.spark; then bad "keymap.spark: a line that is not a comment, blank, or a keymap"; fi
+sh -n spark-w3m || bad "spark-w3m: not POSIX sh"; sh -n spark.cgi || bad "spark.cgi: not POSIX sh"; if grep -qvE '^(#|$|keymap )' keymap.spark; then bad "keymap.spark: a line that is not a comment, blank, or a keymap"; fi
 sh -n .githooks/pre-commit || bad "sh syntax"
 
 # --- 3. docs stay ASCII (read in the editor's help pane, and on a console)
 tab=$(printf '\t')
-for f in README.md CHANGELOG.md CHEATSHEET.md CREDITS.md LICENSE keymap.spark spark-w3m; do
+for f in README.md CHANGELOG.md CHEATSHEET.md CREDITS.md LICENSE keymap.spark spark-w3m spark.cgi; do
     hit=$(LC_ALL=C grep -n "[^ -~${tab}]" "$f" | head -3 || true)
     [ -z "$hit" ] || bad "non-ASCII in $f:
 $hit"

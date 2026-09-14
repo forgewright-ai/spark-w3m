@@ -1,56 +1,55 @@
 # spark-w3m -- spark inside w3m
 
 spark (https://spark.forgewright.ai) is your own AI on your own machine;
-this plugin puts it under one key in w3m. The page you are reading is
-piped to `spark read`, and the answer says only what the page says:
-every line quotes it, and the quote is checked -- a claim the page does
-not hold never reaches you. The first client of `spark read`, and the
-first spark app outside the editors.
+this plugin puts it under one key in w3m. `M-s` (Esc then s) stashes
+the page you are reading and opens the spark page -- a page like any
+other, drawn by w3m itself: a `spark> ` form field, an `overview`
+link, part links when the page is long. Nothing runs until you ask.
+The answer says only what the page says -- every line quotes it, and
+the quote is checked; a claim the page does not hold never reaches
+you. The first client of `spark read`.
 
-One key, spark's key in every app: `M-s` (Esc then s). `spark> `
-appears at the bottom of the screen, and the grammar is the family's:
+    spark> [field]     your question: type, Enter, ask ("does it
+                       mention prices"; a leading ? works too)
+    overview           a link: what does this page cover?
+    part 1 . part 2    links, on a page past 16 kB: read one part
+    B                  never mind -- back to the page you were reading
 
-    Enter or ?         the overview: what does this page cover?
-    your words         your question: does it mention prices? (a
-                       leading ? works too, the editors' habit)
-    --part 2 words     a page past 16 kB answers with its part count;
-                       this reads part 2 (the answer names its part)
-    Ctrl-C             never mind (the buffer stays empty; B goes back)
-
-The answer opens in a new buffer; `B` goes back. When the page does not
-answer, the reply is one line showing the page's own opening words --
-never a guess.
+The answer is a page too, the field repeated below it for the
+follow-up. When the page does not answer, the reply is one line
+showing its own opening words -- never a guess. While the model
+reads, the bottom row says so: `spark reads N characters | 12s`.
 
 ## Install
 
-You need spark 1.20 or newer on this machine (`spark read -h` answers),
-and w3m 0.5.3 or newer (`w3m -version`). Then:
+You need spark 1.20 or newer on this machine (`spark read -h`
+answers), and w3m 0.5.3 or newer (`w3m -version`). Then:
 
 ```sh
 git clone https://github.com/forgewright-ai/spark-w3m ~/.w3m/spark
 ln -s ~/.w3m/spark/spark-w3m ~/.local/bin/spark-w3m
 cat ~/.w3m/spark/keymap.spark >> ~/.w3m/keymap
+printf 'cgi_bin %s/.w3m/spark\n' "$HOME" >> ~/.w3m/config
 ```
 
-`spark-w3m` is the wrapper around `spark read` that draws the `spark> `
-prompt (w3m cannot pre-fill its own), folds stderr into the answer, so
-a refusal shows in w3m's buffer instead of vanishing, and wraps long
-lines at spaces, so the buffer reads without sideways scrolling
-(`SPARK_W3M_WIDTH` sets the column, default 78). From a plain shell the
-same wrapper takes the words directly: `w3m -dump URL | spark-w3m your
-words`. An update is `git -C ~/.w3m/spark pull`, then delete the old
-spark lines from `~/.w3m/keymap` and append again. The comment block in
-`keymap.spark` is the help; M-s is a suggestion -- edit the line to
-taste (w3m's own M-s, save buffer, moves aside). The keys, and what
-to ask: `CHEATSHEET.md`.
+The spark page is w3m's own local CGI (`spark.cgi` in this clone --
+the `cgi_bin` line points w3m at it); `spark-w3m` is the wrapper
+behind it, and from a plain shell it reads any text directly:
+`w3m -dump URL | spark-w3m your words`. An update is `git -C
+~/.w3m/spark pull`, then delete the old spark lines from
+`~/.w3m/keymap` and append again. The comment block in `keymap.spark`
+is the help; M-s is a suggestion (w3m's own M-s, save buffer, moves
+aside) -- edit the line to taste. The keys, and what to ask:
+`CHEATSHEET.md`.
 
 ## What leaves this machine
 
 The rendered page text -- 16 kB a part -- and your words, and only to
-the brain spark is configured for. w3m's pipe carries no URL and no
-file name, so not even that travels. Every run is one call to `spark
-read` with the page on stdin; the plugin never speaks HTTP for itself
-and never sees a token.
+the brain spark is configured for. No URL and no file name travels.
+The stashed text rests on this machine between question and follow-up
+(one file, 0600, your runtime directory; the next M-s replaces it).
+Every run is one call to `spark read`; the plugin never speaks HTTP
+for itself and never sees a token.
 
 ## Contributing
 

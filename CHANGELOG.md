@@ -1,5 +1,18 @@
 # Changelog
 
+## 2.0.0
+
+- The spark page. M-s stashes the rendered page and opens a page of
+  w3m's own: a spark> form field, an overview link, part links past
+  16 kB -- quiet, nothing runs unasked. A question answers as a page
+  carrying the field again, so the follow-up lives where the answer
+  is; B walks back. The 1.x terminal prompt is gone, and with it the
+  whole disease it carried: two programs drawing on one screen. The
+  install gains one line (cgi_bin in ~/.w3m/config); the stash rests
+  0600 in the runtime dir, replaced by the next M-s, and no URL or
+  path travels, as ever. The bottom-row pulse stays while the model
+  reads.
+
 ## 1.2.0
 
 - The wait says what it is, on the one row this wrapper may touch:

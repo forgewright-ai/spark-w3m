@@ -49,32 +49,32 @@ Leaving and help
 
 ## 2. the page, with spark
 
-One key: M-s (Esc then s). The page stays put and `spark> ` appears
-at the bottom of the screen. What you type there is `spark read`'s
-grammar; the answer opens in a new buffer, every line quoting the
-page, and B goes back.
+One key: M-s. The page you are reading is stashed and the spark page
+opens -- a page like any other, drawn by w3m itself. Nothing runs
+until you ask, and B is always the way back.
 
-    Enter or ?     the overview: what does this page cover?
-    your words     your question (a leading ? works too)
-    --part 2 words a page past 16 kB answers with its part count;
-                   this asks part 2
-    Ctrl-C         never mind -- the buffer stays empty, B goes back
+    spark> [field]   your question: Tab to the field, Enter to type,
+                     Enter again, then Tab to [ask] and Enter
+    overview         a link: what does this page cover?
+    part 1 . part 2  links, on a page past 16 kB: read one part
+    B                never mind, or back from an answer
 
 By example
 
-    an article     M-s, Enter
-                   the overview, before you commit to reading it all
-    a long read    M-s, does it mention pricing
+    an article     M-s, overview
+                   what it covers, before you commit to reading it all
+    a long read    M-s, spark> does it mention pricing
                    the answer quotes the lines that do
-    a changelog    M-s, what changed in the newest release
-    a manual       M-s, Enter answers "part 1 of 3 ..." -- then
-                   M-s, --part 3 how do I uninstall
+    a manual       M-s -- the part links appear; part 3, then ask away
+    a follow-up    the answer page carries the field again: ask right
+                   there, B walks back through the exchange
 
-When the page does not hold the answer, the reply is one line showing
-the page's own opening words -- never a guess. That is the design:
-spark read says only what the page says.
+While the model reads, the bottom row counts: `spark reads N
+characters | 12s`. Every answer line quotes the page; when the page
+does not hold the answer, the reply is one line showing the page's
+own opening words -- never a guess.
 
-From a plain shell, the same wrapper takes the words directly:
+From a plain shell, the same wrapper reads any text:
 
     w3m -dump URL | spark-w3m your words
 

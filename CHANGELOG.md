@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.0.1
+
+- The form fits an 80-column console: the field is 40 wide, so
+  `spark> [ field ] [ask]` stays one line instead of wrapping into a
+  shredded bracket row with the overview link pulled through it.
+
 ## 2.0.0
 
 - The spark page. M-s stashes the rendered page and opens a page of

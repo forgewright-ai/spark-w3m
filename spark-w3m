@@ -57,7 +57,7 @@ pulse_stop() {
 # the part links when the stash is parts
 form_and_links() {
     printf '<form action="file:///cgi-bin/spark.cgi" method="GET">\n'
-    printf 'spark&gt; <input type="text" name="q" size="60">\n'
+    printf 'spark&gt; <input type="text" name="q" size="40">\n'
     printf '<input type="submit" name="go" value="ask"></form>\n'
     printf '<p><a href="file:///cgi-bin/spark.cgi?q=">overview</a>'
     if [ "$1" -gt "$PART_MAX" ]; then

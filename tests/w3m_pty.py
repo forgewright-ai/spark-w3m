@@ -47,6 +47,10 @@ if [ "${1-}" = read ] && [ "${2-}" = --ledger ]; then
     printf 'one old question\nanother old question\n'
     exit 0
 fi
+# `edit -h` advertises --source (the reading-discussion posture): the
+# wrapper's guard probes for it and must find it here. Not a turn, so
+# it never touches the log.
+[ "${1-}" = edit ] && [ "${2-}" = "-h" ] && { printf '  --source   discuss a source\n'; exit 0; }
 printf '%s\n' "$*" >> "$STUB_LOG"
 cat > "$STUB_LOG.stdin"
 case " $* " in
@@ -253,8 +257,10 @@ def main():
         ok(b.expect("STUBEDIT"), "words answer as the conversation", b.plain()[-300:])
         lines = [l for l in logged().splitlines() if l.startswith("edit")]
         ok(len(lines) == 1 and lines[0].startswith("edit ? does it mention prices --thread w3m-")
-           and "--about a published page" in lines[0] and "--name gate" in lines[0],
+           and "--about a web page" in lines[0] and "--name gate" in lines[0],
            "spark edit ? got the words, the thread, the about-hint and the name", logged())
+        ok("--source" in lines[0],
+           "the reading-discussion posture: --source rides when spark advertises it", logged())
         field_say(b, "and the fine print")
         time.sleep(1.0)
         lines = [l for l in logged().splitlines() if l.startswith("edit")]

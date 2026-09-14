@@ -47,7 +47,10 @@ W=${SPARK_W3M_WIDTH:-78}
 STASH=${SPARK_W3M_STASH:-${XDG_RUNTIME_DIR:-${TMPDIR:-/tmp}}/spark-w3m-$(id -u)}
 PART_MAX=16000
 CGI="file:///cgi-bin/spark.cgi"
-ABOUT="a published page the reader is discussing with you -- not a draft to review"
+ABOUT="a web page"
+# does this spark advertise --source (the reading-discussion posture,
+# 1.32+)? probe once; empty means an older spark and the conversation
+# runs exactly as before.
 
 html() {
     sed 's/&/\&amp;/g; s/</\&lt;/g; s/>/\&gt;/g'
@@ -313,6 +316,10 @@ case ${1-} in
             set -- '?' $q --thread "$T" --about "$ABOUT"
             set +f
             [ -z "$TITLE" ] || set -- "$@" --name "$TITLE"
+            # --source picks the reading-discussion posture when this
+            # spark advertises it (older spark: the flag is absent and
+            # the argv is built exactly as before)
+            spark edit -h 2>/dev/null | grep -q -- --source && set -- "$@" --source
             saved_controls=$from
             run_spark "$label" spark edit "$@"
             umask 077

@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.1.1
+
+- The conversation asks in the reading-discussion posture. spark 1.32
+  gained `spark edit ? --source` -- the page is a published source you
+  discuss, not a draft you edit -- and the wrapper passes it, guarded,
+  so an older spark is unchanged. The verbose about-hint shrinks to "a
+  web page"; the overview, parts and questions rooms are untouched
+  (they are spark read and spark ask, not the conversation).
+
 ## 2.1.0
 
 - The spark page becomes a place. The front room greets with spark's

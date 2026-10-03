@@ -48,6 +48,7 @@ if [ "${1-}" = read ] && [ "${2-}" = --ledger ]; then
     exit 0
 fi
 printf '%s\n' "$*" >> "$STUB_LOG"
+printf '%s\n' "$@" > "$STUB_LOG.argv"
 cat > "$STUB_LOG.stdin"
 case " $* " in
     *" fail "*)   printf 'spark: the source does not answer -- it opens: "STUBOPENING ..."\n' >&2; exit 1 ;;
@@ -177,7 +178,7 @@ def main():
                 return ""
 
         def clean():
-            for p in (log, log + ".stdin", stash, stash + ".thread",
+            for p in (log, log + ".stdin", log + ".argv", stash, stash + ".thread",
                       stash + ".name", stash + ".chat"):
                 if os.path.exists(p):
                     os.unlink(p)
@@ -252,7 +253,8 @@ def main():
         field_say(b, "?does it mention prices")
         ok(b.expect("STUBEDIT"), "words answer as the conversation", b.plain()[-300:])
         lines = [l for l in logged().splitlines() if l.startswith("edit")]
-        ok(len(lines) == 1 and lines[0].startswith("edit ? does it mention prices --thread w3m-")
+        ok(len(lines) == 1 and lines[0].startswith("edit --thread w3m-")
+           and lines[0].endswith(" -- ? does it mention prices")
            and "--about a published page" in lines[0] and "--name gate" in lines[0],
            "spark edit ? got the words, the thread, the about-hint and the name", logged())
         field_say(b, "and the fine print")
@@ -314,7 +316,8 @@ def main():
         b.send("\r", 2.0)
         time.sleep(0.5)
         lines = [l for l in logged().splitlines() if l.startswith("edit")]
-        ok(len(lines) == 1 and lines[0].startswith("edit ? ASKONE? --thread w3m-"),
+        ok(len(lines) == 1 and lines[0].startswith("edit --thread w3m-")
+           and lines[0].endswith(" -- ? ASKONE?"),
            "a question link asks itself in the conversation", logged())
         b.close()
 
@@ -342,6 +345,34 @@ def main():
                            capture_output=True, text=True, env=env2)
         ok("moved on" in p.stdout and not os.path.exists(log),
            "a stale form runs nothing and says the stash moved on", p.stdout[-200:])
+
+        # N. a question that starts with `--` (a questions-room link is
+        # model text from the page) reaches spark edit as WORDS: every
+        # option comes first, then `--`, then the words, so --watch FILE
+        # and --ledger clear never become options
+        clean()
+        with open(stash, "w") as f:
+            f.write("some stashed text\n")
+        with open(stash + ".thread", "w") as f:
+            f.write("w3m-1-1\n")
+        with open(stash + ".name", "w") as f:
+            f.write("gate\n")
+        env2 = dict(env)
+        env2["QUERY_STRING"] = "q=--watch%20notes.txt%20--ledger%20clear&t=w3m-1-1&from=chat"
+        p = subprocess.run([os.path.join(bindir, "spark-w3m"), "--page"],
+                           capture_output=True, text=True, env=env2)
+        try:
+            with open(log + ".argv") as f:
+                argv = f.read().splitlines()
+        except OSError:
+            argv = []
+        cut = argv.index("--") if "--" in argv else -1
+        ok(p.returncode == 0 and argv[:1] == ["edit"] and cut > 0
+           and argv[cut + 1:] == ["?", "--watch", "notes.txt", "--ledger", "clear"]
+           and "--watch" not in argv[:cut] and "--ledger" not in argv[:cut]
+           and argv[1:3] == ["--thread", "w3m-1-1"] and "--name" in argv[:cut],
+           "a question that says --watch FILE or --ledger clear stays words, after --",
+           repr(argv))
 
         # F. from a plain shell the wrapper takes the words directly,
         # and a long answer wraps at spaces

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.1.1
+
+- A question can no longer turn into an option. Before, the words
+  went to `spark edit` loose, so a question link the model made from
+  a page could say `--watch FILE` or `--ledger clear` and spark would
+  obey it. Now every option comes first, then `--`, then the words.
+- Needs spark 1.46 or newer (the first `spark edit` that knows `--`).
+- CI: each privacy check now fails the step, a hit names the file
+  only, actions are pinned by commit, and the token is read-only.
+
 ## 2.1.0
 
 - The spark page becomes a place. The front room greets with spark's

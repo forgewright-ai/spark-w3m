@@ -309,10 +309,15 @@ case ${1-} in
             case $q in "?"*) q=${q#?} ;; esac
             label="reading $SIZE characters"
             [ -f "$STASH.chat" ] && label="thinking"
+            # every option first, then `--`, then the words: a question
+            # (and a questions-room link is model text from the page)
+            # that says --watch FILE or --ledger clear stays words
             set -f
-            set -- '?' $q --thread "$T" --about "$ABOUT"
+            set -- '?' $q
             set +f
-            [ -z "$TITLE" ] || set -- "$@" --name "$TITLE"
+            set -- -- "$@"
+            [ -z "$TITLE" ] || set -- --name "$TITLE" "$@"
+            set -- --thread "$T" --about "$ABOUT" "$@"
             saved_controls=$from
             run_spark "$label" spark edit "$@"
             umask 077

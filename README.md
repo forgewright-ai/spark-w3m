@@ -29,8 +29,8 @@ counts what was asked of this page before (spark's reading ledger).
 
 ## Install
 
-You need spark 1.20 or newer on this machine (`spark read -h` and
-`spark ask -h` answer), and w3m 0.5.3 or newer (`w3m -version`). Then:
+You need spark 1.46 or newer on this machine (`spark edit -h` lists
+`--`), and w3m 0.5.3 or newer (`w3m -version`). Then:
 
 ```sh
 git clone https://github.com/forgewright-ai/spark-w3m ~/.w3m/spark

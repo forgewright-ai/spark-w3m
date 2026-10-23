@@ -1,5 +1,16 @@
 # Changelog
 
+## 2.1.2
+
+- The wait ends without a word. On macOS, whose /bin/sh is bash 3.2,
+  every answer came with `Terminated: 15` and the pulse's whole source
+  on the wrapper's stderr: the shell reported the pulse it had
+  stopped. The pulse is no job of the shell now, so nothing reports
+  it, and it is gone before the bottom row is erased. dash (Debian,
+  Void) and bash 5 were quiet already.
+- A test: a slow answer through the page, stderr read for the notice,
+  and no pulse left running after the request.
+
 ## 2.1.1
 
 - A question can no longer turn into an option. Before, the words

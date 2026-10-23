@@ -63,23 +63,47 @@ urldec() {
 
 # The pulse, on the one row this wrapper may touch: conversational and
 # truthful -- reading the page the first time, thinking after.
-pulse_start() {
-    P_T0=$(date +%s)
-    ( n=0
-      while :; do
-          case $((n % 4)) in
-              0) f='|' ;; 1) f='/' ;; 2) f='-' ;; 3) f='\' ;;
-          esac
-          printf '\033[9999;1H\033[2K%s  %s %ss' \
-              "$1" "$f" "$(( $(date +%s) - P_T0 ))" > /dev/tty 2>/dev/null
-          n=$((n + 1))
-          sleep 0.25
-      done ) 2>/dev/null &
-    PULSE=$!
+#
+# The pulse is no job of this shell: it starts inside a command
+# substitution and outlives the subshell that launched it, so this
+# shell never reaps it and never reports its end. bash 3.2, macOS's
+# /bin/sh, reports a job a signal ended -- "Terminated: 15" and the
+# job's whole source, on the screen the answer is on. The substitution
+# reads to the end of its output, so the pulse holds none of it open:
+# it draws on /dev/tty alone. The loop is a function because bash 3.2
+# misreads a case pattern's `)` inside `$( )`, and the redirections
+# sit on a subshell around it because dash keeps a copy of every fd a
+# function call redirects, the pipe too, open for as long as it runs.
+pulse_loop() {
+    n=0
+    while :; do
+        case $((n % 4)) in
+            0) f='|' ;; 1) f='/' ;; 2) f='-' ;; 3) f='\' ;;
+        esac
+        printf '\033[9999;1H\033[2K%s  %s %ss' \
+            "$1" "$f" "$(( $(date +%s) - P_T0 ))" > /dev/tty 2>/dev/null
+        n=$((n + 1))
+        sleep 0.25
+    done
 }
 
+pulse_start() {
+    P_T0=$(date +%s)
+    PULSE=$( (pulse_loop "$1") < /dev/null > /dev/null 2>&1 & echo $! )
+}
+
+# kill, then let it be gone before the erase, or a last frame could
+# land after it. It is no child of this shell, so `wait` cannot: a
+# tenth of a second at most, in fiftieths.
 pulse_stop() {
-    [ -z "${PULSE-}" ] || kill "$PULSE" 2>/dev/null
+    if [ -n "${PULSE-}" ]; then
+        kill "$PULSE" 2>/dev/null
+        p_i=0
+        while [ "$p_i" -lt 5 ] && kill -0 "$PULSE" 2>/dev/null; do
+            sleep 0.02
+            p_i=$((p_i + 1))
+        done
+    fi
     PULSE=
     printf '\033[9999;1H\033[2K' > /dev/tty 2>/dev/null
 }

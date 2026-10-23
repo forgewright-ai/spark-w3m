@@ -53,6 +53,7 @@ cat > "$STUB_LOG.stdin"
 case " $* " in
     *" fail "*)   printf 'spark: the source does not answer -- it opens: "STUBOPENING ..."\n' >&2; exit 1 ;;
     *" long "*)   i=0; while [ $i -lt 40 ]; do printf 'wrapword '; i=$((i+1)); done; printf '\n'; exit 0 ;;
+    *" slow "*)   sleep 1.2 ;;   # the pulse turns a few frames first
 esac
 case ${1-} in
     edit) printf 'the page holds "held words" [not in the text] STUBEDIT' ;;
@@ -373,6 +374,32 @@ def main():
            and argv[1:3] == ["--thread", "w3m-1-1"] and "--name" in argv[:cut],
            "a question that says --watch FILE or --ledger clear stays words, after --",
            repr(argv))
+
+        # O. the wait's pulse ends without a word: no shell reports it
+        # (macOS's /bin/sh, bash 3.2, printed "Terminated: 15" and the
+        # pulse's whole source when the answer came), and no pulse
+        # outlives the request. Its own session: no terminal to draw on.
+        clean()
+        with open(stash, "w") as f:
+            f.write("some stashed text\n")
+        with open(stash + ".thread", "w") as f:
+            f.write("w3m-1-1\n")
+        with open(stash + ".name", "w") as f:
+            f.write("gate\n")
+        env2 = dict(env)
+        env2["QUERY_STRING"] = "q=slow%20question&t=w3m-1-1&from=chat"
+        p = subprocess.run([os.path.join(bindir, "spark-w3m"), "--page"],
+                           capture_output=True, text=True, env=env2, start_new_session=True)
+        ok(p.returncode == 0 and "STUBEDIT" in p.stdout, "a slow answer comes back", p.stdout[-200:] + p.stderr)
+        ok("Terminated" not in p.stderr + p.stdout and "while :" not in p.stderr + p.stdout,
+           "the pulse ends silently: no job notice", p.stderr[-300:])
+        time.sleep(0.5)
+        try:
+            procs = subprocess.run(["ps", "-A", "-o", "command="], capture_output=True, text=True).stdout
+            left = [l for l in procs.splitlines() if os.path.join(bindir, "spark-w3m") in l]
+            ok(not left, "no pulse outlives the request", repr(left))
+        except OSError:
+            print("  skip no pulse outlives the request (no ps here)")
 
         # F. from a plain shell the wrapper takes the words directly,
         # and a long answer wraps at spaces

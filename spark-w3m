@@ -81,7 +81,7 @@ pulse_loop() {
             0) f='|' ;; 1) f='/' ;; 2) f='-' ;; 3) f='\' ;;
         esac
         printf '\033[9999;1H\033[2K%s  %s %ss' \
-            "$1" "$f" "$(( $(date +%s) - P_T0 ))" > /dev/tty 2>/dev/null
+            "$1" "$f" "$(( $(date +%s) - P_T0 ))" 2>/dev/null > /dev/tty
         n=$((n + 1))
         sleep 0.25
     done
@@ -105,7 +105,7 @@ pulse_stop() {
         done
     fi
     PULSE=
-    printf '\033[9999;1H\033[2K' > /dev/tty 2>/dev/null
+    printf '\033[9999;1H\033[2K' 2>/dev/null > /dev/tty
 }
 
 # spark's face: the banner's first eight columns, read at runtime from

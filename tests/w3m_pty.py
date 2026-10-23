@@ -393,6 +393,8 @@ def main():
         ok(p.returncode == 0 and "STUBEDIT" in p.stdout, "a slow answer comes back", p.stdout[-200:] + p.stderr)
         ok("Terminated" not in p.stderr + p.stdout and "while :" not in p.stderr + p.stdout,
            "the pulse ends silently: no job notice", p.stderr[-300:])
+        ok("/dev/tty" not in p.stderr, "with no terminal, the pulse's row stays quiet: no word on stderr",
+           p.stderr[-300:])
         time.sleep(0.5)
         try:
             procs = subprocess.run(["ps", "-A", "-o", "command="], capture_output=True, text=True).stdout

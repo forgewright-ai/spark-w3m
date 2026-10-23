@@ -8,8 +8,13 @@
   stopped. The pulse is no job of the shell now, so nothing reports
   it, and it is gone before the bottom row is erased. dash (Debian,
   Void) and bash 5 were quiet already.
+- With no terminal, the pulse's row says nothing: `2>/dev/null` comes
+  before `> /dev/tty` now, so a failed open is quiet. Before, the
+  shell printed `/dev/tty: Device not configured` on stderr when the
+  answer came.
 - A test: a slow answer through the page, stderr read for the notice,
-  and no pulse left running after the request.
+  nothing on it about /dev/tty, and no pulse left running after the
+  request.
 
 ## 2.1.1
 
